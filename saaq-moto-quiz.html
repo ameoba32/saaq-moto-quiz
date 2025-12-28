@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Motorcycle Handling – Practice Questions</title>
+    <link rel="stylesheet" href="saaq-moto-quiz.css">
+  </head>
+  <body>
+    <div id="app">
+      <div class="header-bar">
+        <h1>Motorcycle Handling – Practice Questions</h1>
+
+        <div class="toolbar">
+          <label>
+            Language:
+            <select v-model="language">
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <small>
+        Uses shared dataset from <code>quiz-data.js</code>.
+      </small>
+
+      <section v-if="screen === 'setup'">
+        <fieldset class="mode-choice">
+          <legend>{{ ui.mode }}</legend>
+
+          <label>
+            <input type="radio" name="mode" value="chapter" v-model="mode">
+            {{ ui.modeChapter }}
+          </label>
+
+          <label>
+            <input type="radio" name="mode" value="random30" v-model="mode">
+            {{ ui.modeRandom30 }}
+          </label>
+        </fieldset>
+
+        <fieldset v-if="mode === 'chapter'">
+          <legend>{{ ui.chooseChapter }}</legend>
+          <label>
+            {{ ui.chapter }}
+            <select v-model="selectedChapterId" :disabled="chapters.length === 0">
+              <option v-for="c in chapters" :key="c.id" :value="c.id">
+                {{ localizedChapterTitle(c) }}
+              </option>
+            </select>
+          </label>
+        </fieldset>
+
+        <div v-if="loadError" class="muted">
+          {{ loadError }}
+        </div>
+
+        <div class="setup-actions">
+          <button type="button" @click="startQuiz" :disabled="startDisabled">{{ ui.start }}</button>
+        </div>
+      </section>
+
+      <section v-else>
+        <div class="quiz-header">
+          <div>
+            <h2 class="mb0">{{ quizTitle }}</h2>
+            <div class="muted">{{ quizSubtitle }}</div>
+          </div>
+
+          <div class="quiz-actions">
+            <button type="button" @click="resetQuiz">{{ ui.back }}</button>
+          </div>
+        </div>
+
+        <div v-if="quizQuestions.length === 0" class="muted">{{ ui.noQuestionsAvailable }}</div>
+
+        <div v-else>
+          <div
+            v-for="(q, idx) in quizQuestions"
+            :key="q.id"
+            class="question"
+            :class="questionClass(q.id)"
+          >
+            <div class="question-text">
+              {{ idx + 1 }}. {{ localizedQuestionText(q.question) }}
+              <span class="muted">({{ localizedSectionTitle(q.section) }})</span>
+            </div>
+
+            <div class="question-options">
+              <label>
+                <input
+                  type="radio"
+                  :name="q.id"
+                  :value="true"
+                  v-model="answers[q.id]"
+                  @change="markChecked(q.id)"
+                  :disabled="checked[q.id] === true"
+                >
+                {{ ui.true }}
+              </label>
+
+              <label class="ml">
+                <input
+                  type="radio"
+                  :name="q.id"
+                  :value="false"
+                  v-model="answers[q.id]"
+                  @change="markChecked(q.id)"
+                  :disabled="checked[q.id] === true"
+                >
+                {{ ui.false }}
+              </label>
+
+              <span class="feedback" :class="feedbackClass(q.id)">
+                {{ feedbackText(q.id) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="quiz-footer">
+            <button type="button" @click="clearAnswers">{{ ui.clear }}</button>
+            <div class="score">{{ statsText }}</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="saaq-moto-quiz-data.js"></script>
+    <script src="saaq-moto-quiz-data-fr.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+      "use strict";
+
+      const quizData = Array.isArray(window.quizData) ? window.quizData : [];
+      const i18nFr = window.quizI18n?.fr ?? null;
+
+      Vue.createApp({
+        data() {
+          const firstChapter = quizData[0] ?? null;
+
+          return {
+            screen: "setup",
+            mode: "chapter",
+            language: "en",
+            chapters: quizData,
+            selectedChapterId: firstChapter?.id ?? "",
+            answers: {},
+            checked: {},
+            quizQuestions: [],
+            loadError: quizData.length === 0 ? "Quiz data not found. Ensure quiz-data.js is loaded." : "",
+          };
+        },
+        computed: {
+          ui() {
+            if (this.language === "fr") {
+            return {
+              mode: "Mode",
+              modeChapter: "Chapitre – choisir un chapitre",
+              modeRandom30: "30 questions au hasard",
+              chooseChapter: "Choisir un chapitre",
+              chapter: "Chapitre :",
+              start: "Démarrer",
+              back: "Retour",
+              true: "Vrai",
+              false: "Faux",
+              clear: "Effacer",
+              correct: "Correct",
+              incorrect: "Incorrect",
+              noAnswer: "Aucune réponse sélectionnée.",
+              noQuestionsChapter: "Aucune question pour ce chapitre.",
+                noQuestionsAvailable: "Aucune question disponible.",
+                stats: ({ correct, total, checked, remaining, incorrect, unanswered }) =>
+                  `Résultats : ${correct} / ${total} | vérifiées : ${checked} | restantes : ${remaining} | incorrectes : ${incorrect} | sans réponse : ${unanswered}`
+              };
+            }
+
+            return {
+              mode: "Mode",
+              modeChapter: "Chapter – choose a chapter",
+              modeRandom30: "Random 30 questions",
+              chooseChapter: "Choose chapter",
+              chapter: "Chapter:",
+              start: "Start",
+              back: "Back",
+              true: "True",
+              false: "False",
+              clear: "Clear",
+              correct: "Correct",
+              incorrect: "Incorrect",
+              noAnswer: "No answer selected.",
+              noQuestionsChapter: "No questions for this chapter.",
+              noQuestionsAvailable: "No questions available.",
+              stats: ({ correct, total, checked, remaining, incorrect, unanswered }) =>
+                `Stats: ${correct} / ${total} | checked: ${checked} | remaining: ${remaining} | incorrect: ${incorrect} | unanswered: ${unanswered}`
+            };
+          },
+          selectedChapter() {
+            return this.chapters.find((c) => c.id === this.selectedChapterId) ?? null;
+          },
+          startDisabled() {
+            if (this.chapters.length === 0) return true;
+            if (this.mode === "chapter" && !this.selectedChapterId) return true;
+            return false;
+          },
+          quizTitle() {
+            if (this.mode === "chapter") return this.localizedChapterTitle(this.selectedChapter);
+            return this.language === "fr" ? "30 questions au hasard" : "Random 30 questions";
+          },
+          quizSubtitle() {
+            if (this.mode === "chapter") return this.language === "fr" ? "Toutes les questions du chapitre" : "All questions from the chapter";
+            return this.language === "fr" ? "Questions tirées de tous les chapitres" : "Questions from all chapters";
+          },
+          stats() {
+            const total = this.quizQuestions.length;
+
+            let checked = 0;
+            let correct = 0;
+            let incorrect = 0;
+            let unanswered = 0;
+
+            for (const q of this.quizQuestions) {
+              if (this.checked[q.id] !== true) continue;
+
+              checked++;
+
+              const userAnswer = this.answers[q.id];
+              if (userAnswer === undefined) {
+                unanswered++;
+                continue;
+              }
+
+              if (userAnswer === q.question.answer) correct++;
+              else incorrect++;
+            }
+
+            const remaining = Math.max(0, total - checked);
+            return { total, checked, remaining, correct, incorrect, unanswered };
+          },
+          statsText() {
+            if (this.quizQuestions.length === 0) return "";
+            return this.ui.stats(this.stats);
+          }
+        },
+        watch: {
+          selectedChapterId() {
+            if (this.screen !== "setup") this.resetQuiz();
+          },
+          mode() {
+            if (this.screen !== "setup") this.resetQuiz();
+          }
+        },
+        methods: {
+          localizedChapterTitle(chapter) {
+            if (!chapter) return "";
+            if (this.language !== "fr") return chapter.title;
+            return i18nFr?.chapters?.[chapter.id] ?? chapter.title;
+          },
+          localizedSectionTitle(section) {
+            if (!section) return "";
+            if (this.language !== "fr") return section.title;
+            return i18nFr?.sections?.[section.id] ?? section.title;
+          },
+          localizedQuestionText(question) {
+            if (!question) return "";
+            if (this.language !== "fr") return question.text;
+            return i18nFr?.questions?.[question.id] ?? question.text;
+          },
+          resetQuizState() {
+            this.answers = {};
+            this.checked = {};
+          },
+          clearAnswers() {
+            this.resetQuizState();
+          },
+          questionClass(qid) {
+            if (this.checked[qid] !== true) return "";
+            if (this.answers[qid] === undefined) return "incorrect";
+            return this.answers[qid] === this.correctAnswer(qid) ? "correct" : "incorrect";
+          },
+          feedbackClass(qid) {
+            if (this.checked[qid] !== true) return "";
+            if (this.answers[qid] === undefined) return "incorrect";
+            return this.answers[qid] === this.correctAnswer(qid) ? "correct" : "incorrect";
+          },
+          feedbackText(qid) {
+            if (this.checked[qid] !== true) return "";
+            if (this.answers[qid] === undefined) return this.ui.noAnswer;
+            return this.answers[qid] === this.correctAnswer(qid) ? this.ui.correct : this.ui.incorrect;
+          },
+          correctAnswer(qid) {
+            const q = this.quizQuestions.find((x) => x.id === qid);
+            return q ? q.question.answer : false;
+          },
+          allQuestions() {
+            return this.chapters.flatMap((chapter) =>
+              (chapter.sections ?? []).flatMap((section) =>
+                (section.questions ?? []).map((question) => ({
+                  id: question.id,
+                  chapter,
+                  section,
+                  question
+                }))
+              )
+            );
+          },
+          shuffle(items) {
+            const list = [...items];
+            for (let i = list.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [list[i], list[j]] = [list[j], list[i]];
+            }
+            return list;
+          },
+          startQuiz() {
+            this.resetQuizState();
+
+            const all = this.allQuestions();
+            if (this.mode === "random30") {
+              this.quizQuestions = this.shuffle(all).slice(0, 30);
+              this.screen = "quiz";
+              return;
+            }
+
+            const chapter = this.selectedChapter;
+            const sections = chapter?.sections ?? [];
+            this.quizQuestions = sections.flatMap((section) =>
+              section.questions.map((question) => ({
+                id: question.id,
+                chapter,
+                section,
+                question
+              }))
+            );
+            this.screen = "quiz";
+          },
+          resetQuiz() {
+            this.screen = "setup";
+            this.resetQuizState();
+            this.quizQuestions = [];
+          },
+          markChecked(qid) {
+            if (this.checked[qid] === true) return;
+            this.checked = { ...this.checked, [qid]: true };
+          }
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>
